@@ -1,0 +1,35 @@
+.NET
+
+[Bb]in/
+[Oo]bj/
+*.user
+*.userosscache
+*.sln.docstates
+
+Visual Studio Code
+
+.vscode/
+
+Node (React)
+
+node_modules/
+dist/
+dist-ssr
+*.local
+.eslintcache
+
+SQL Server
+
+*.mdf
+*.ldf
+
+OS Files
+
+.DS_Store
+Thumbs.db
+
+Environment Files
+
+.env
+.env.local
+.env.development.local
