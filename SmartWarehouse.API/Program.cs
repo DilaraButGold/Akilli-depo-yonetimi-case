@@ -2,46 +2,54 @@ using Microsoft.EntityFrameworkCore;
 using SmartWarehouse.API.Data;
 using SmartWarehouse.API.Repositories;
 using SmartWarehouse.API.Managers;
+using SmartWarehouse.API.Hubs;
+using SmartWarehouse.API.Services;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- SERVİS KAYITLARI (Dependency Injection) ---
-
-// 1. CORS Politikası (Frontend erişimi için)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
         policy.WithOrigins("http://localhost:5173")
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials(); 
     });
 });
 
-// 2. JSON Yapılandırması (Kritik Kural: Response PascalCase döner)
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
-    // Bu ayar, API yanıtlarının Property isimlerini (Örn: Success, Data) 
-    // dökümanda istendiği gibi PascalCase olarak korunmasını sağlar.
     options.JsonSerializerOptions.PropertyNamingPolicy = null;
 });
 
-// 3. Veritabanı ve Repository Kayıtları
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-
-// 4. Manager Kayıtları
 builder.Services.AddScoped<IProductManager, ProductManager>();
 builder.Services.AddScoped<IStockMovementManager, StockMovementManager>();
+builder.Services.AddScoped<IWarehouseZoneManager, WarehouseZoneManager>(); 
 
+builder.Services.AddSignalR(); 
 builder.Services.AddOpenApi(); 
 
 var app = builder.Build();
 
-// --- HTTP İSTEK BORU HATTI ---
+// Global hata yakalayıcı middleware - EN ÜSTE OLMALI
+app.Use(async (context, next) => {
+    try {
+        await next();
+    } catch (Exception ex) {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        // Sadece Message ile dön, Success false olsun
+        var response = new { Success = false, Message = ex.Message };
+        await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+    }
+});
+
 app.UseCors("AllowReactApp");
 
 if (app.Environment.IsDevelopment())
@@ -52,5 +60,6 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<WarehouseHub>("/warehouseHub");
 
 app.Run();

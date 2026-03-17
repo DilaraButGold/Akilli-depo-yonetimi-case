@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SmartWarehouse.API.Data;
 using SmartWarehouse.API.Entities;
 
@@ -15,20 +16,13 @@ public class Repository<T> : IRepository<T> where T : BaseEntity
         _dbSet = context.Set<T>();
     }
 
-    public async Task<T?> GetByIdAsync(int id, string companyId)
-    {
-        return await _dbSet.FirstOrDefaultAsync(e => e.Id == id && e.CompanyId == companyId && !e.IsDeleted);
-    }
+    public async Task<T?> GetByIdAsync(int id, string companyId) =>
+        await _dbSet.FirstOrDefaultAsync(e => e.Id == id && e.CompanyId == companyId && !e.IsDeleted);
 
-    public IQueryable<T> Query(string companyId)
-    {
-        return _dbSet.Where(e => e.CompanyId == companyId && !e.IsDeleted).AsQueryable();
-    }
+    public IQueryable<T> Query(string companyId) =>
+        _dbSet.Where(e => e.CompanyId == companyId && !e.IsDeleted).AsQueryable();
 
-    public async Task AddAsync(T entity)
-    {
-        await _dbSet.AddAsync(entity);
-    }
+    public async Task AddAsync(T entity) => await _dbSet.AddAsync(entity);
 
     public void Update(T entity)
     {
@@ -36,8 +30,10 @@ public class Repository<T> : IRepository<T> where T : BaseEntity
         _context.Entry(entity).State = EntityState.Modified;
     }
 
-    public async Task SaveChangesAsync()
-    {
-        await _context.SaveChangesAsync();
-    }
+    public void Delete(T entity) => _dbSet.Remove(entity);
+
+    public async Task SaveChangesAsync() => await _context.SaveChangesAsync();
+
+    public async Task<IDbContextTransaction> BeginTransactionAsync() => 
+        await _context.Database.BeginTransactionAsync();
 }
