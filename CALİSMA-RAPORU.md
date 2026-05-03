@@ -1,98 +1,139 @@
- AKILLI DEPO YÖNETİM SİSTEMİ - PROJE ÇALIŞMA RAPORU
+# 🏭 Akıllı Depo Yönetim Sistemi (Smart Warehouse Management System)
 
-GİRİŞ
+> **.NET 9.0 Web API + React 18 + React Native**  
+> Çok kiracılı (multi‑tenant), rol tabanlı yetkilendirme, üretim emri takibi ve yapay zeka destekli stok tahmini içeren **tam kapsamlı** depo yönetim platformu.
 
-Bu rapor, mülakat dokümanında belirtilen gereksinimler doğrultusunda geliştirilen Akıllı Depo Yönetim Sistemi'nin detaylı açıklamasını içermektedir. Proje; temel depo operasyonlarını dijitalleştirmek, stok takibini görselleştirmek ve çoklu şirket (multi-tenant) yapısını desteklemek amacıyla geliştirilmiştir.
+---
 
-1. NE YAPILDI?
+## 📖 Proje Hakkında
 
-TEMEL VE TEKNİK ÇÖZÜMLER
+Bu proje, mülakat dokümanında belirtilen gereksinimler doğrultusunda geliştirilmiş, küçük ve orta ölçekli üretim tesislerinin depo operasyonlarını dijitalleştirmeyi hedefleyen bir sistemdir.  
 
-Ürün Yönetimi: CRUD operasyonları (Ekleme, Düzenleme, Silme) başarıyla uygulandı. Silme işlemleri veri güvenliği için Soft Delete mantığıyla kurgulandı.
+- **Web Paneli:** Depo yöneticileri ve personel için kapsamlı bir yönetim arayüzü.  
+- **Mobil Uygulama:** Barkod/QR kod okuma ile anlık stok giriş/çıkış işlemleri.  
+- **Yapay Zeka:** .NET içerisinde **Moving Average** algoritması ile stok tükenme tahmini.  
 
-Depo Operasyonları: Stok giriş (IN) ve çıkış (OUT) işlemleri, kapasite ve yeterlilik kontrolleriyle entegre edildi.
+---
 
-Multi-Tenant: Her entity'de CompanyId alanı kullanılarak tam veri izolasyonu sağlandı.
+## Proje Mimarisi (N‑Tier Architecture) 
 
-Server-Side Pagination: Tüm listeleme sayfalarında 25 kayıtlık sayfalama, arama ve filtreleme desteği sunuldu.
+┌─────────────────────────────────────────────────────┐
+│ FRONTEND │
+│ React 18 · TypeScript · MUI · Recharts · SignalR │
+│ React Native (Expo) · Expo Barcode Scanner │
+├─────────────────────────────────────────────────────┤
+│ BACKEND │
+│ ASP.NET Core 9.0 · EF Core · JWT · Identity │
+│ N‑Tier: Entity → Repository → Manager → Controller │
+├─────────────────────────────────────────────────────┤
+│ VERİTABANI │
+│ SQL Server · EF Core Migrations │
+└─────────────────────────────────────────────────────┘ 
 
-Mimari Yapı: Veritabanı şeması EF Core Migration ile oluşturuldu; Frontend tarafında React, TypeScript ve MUI ile Single Page Application (SPA) deneyimi sağlandı.
 
-2. KATMANLI MİMARİ VE TASARIM
+**Katmanlar:**
+- **Entity Katmanı:** `BaseEntity` ile ortak alanlar (`CompanyId`, `IsDeleted`).  
+- **Repository Katmanı:** `Generic Repository Pattern` ve `Transaction` yönetimi.  
+- **Manager (Business) Katmanı:** İş kuralları, validasyon ve kapasite kontrolleri.  
+- **Controller Katmanı:** RESTful API endpoint'leri (JWT + Rol bazlı yetkilendirme).
 
-MİMARİ KATMANLAR
+---
 
-Proje, sorumlulukların net ayrıldığı N-Tier Architecture prensibiyle geliştirilmiştir:
+## Özellikler
 
-Entity Katmanı: BaseEntity üzerinden ortak alanların (CompanyId, IsDeleted) merkezi yönetimi.
+### Temel Depo Yönetimi
+- ✅ Ürün CRUD (soft‑delete ile veri güvenliği)  
+- ✅ Stok Giriş (IN) / Çıkış (OUT) işlemleri, kapasite kontrolü  
+- ✅ **Fixed Location (Sabit Lokasyon)** depo modeli: 6 Bölge → 4 Koridor → 7 Raf → Toplam 168 Raf  
+- ✅ Server‑side pagination, arama ve filtreleme  
+- ✅ **Multi‑Tenant:** Her entity'de `CompanyId` ile tam veri izolasyonu  
+- ✅ **İnteraktif Depo Haritası:** Bölge dolulukları renk kodlu, raf detayları modal ile görüntüleme  
+- ✅ **Kritik Stok Uyarıları:** 50 birim altına düşen raflar için anlık bildirim  
 
-Repository Katmanı: Generic Repository pattern ile merkezi veritabanı erişimi ve Transaction yönetimi.
+### Kimlik Doğrulama & Yetkilendirme
+- ✅ ASP.NET Core **Identity** + **JWT** (JSON Web Token)  
+- ✅ Rol tabanlı erişim kontrolü: `Admin`, `WarehouseManager`, `WarehouseStaff`, `Accountant`  
+- ✅ **AppDbContext** üzerinde global `HasQueryFilter` ile şirket bazlı izolasyon  
 
-Manager (Business) Katmanı: İş kuralları, validasyonlar ve kapasite kontrollerinin yapıldığı merkezdir.
+### Üretim Emri (Work Order) Modülü
+- ✅ Mamul ürün seçimi, otomatik reçete (Bill of Materials) okuma  
+- ✅ Malzeme yeterlilik kontrolü  
+- ✅ Üretim başlatma → hammadde stoklarından düşme  
+- ✅ Üretim tamamlama → mamul stoğa ekleme, fire kaydı  
+- ✅ Üretim emri durum takibi: Taslak → Onaylandı → Üretimde → Tamamlandı → İptal  
 
-Controller Katmanı: HTTP standartlarına (POST/GET) uygun API endpoint yönetimi.
+### Veri Bilimi (AI/ML) Entegrasyonu
+- ✅ **Tamamen .NET içerisinde** çalışan stok tahmin mekanizması  
+- ✅ **Hareketli Ortalama (Moving Average)** yöntemiyle günlük çıkış tahmini  
+- ✅ "Mevcut stok kaç gün yeter?" sorusuna cevap  
+- ✅ **Kritik Stok Uyarı Kartı:** Dashboard'da tahmini tükenme süresi 3 günden az olan ürünler listelenir  
 
-MULTI-TENANT VE SOFT DELETE YAKLAŞIMI
+### Mobil Uygulama (React Native / Expo)
+- ✅ **Expo** ile oluşturulmuş cross‑platform mobil uygulama  
+- ✅ **Expo Barcode Scanner** ile kamera üzerinden barkod/QR kod okuma  
+- ✅ Okunan barkod ile ürün sorgulama ve stok hareketi oluşturma  
+- ✅ JWT tabanlı güvenli giriş, AsyncStorage ile token saklama  
 
-Veri İzolasyonu: Repository katmanındaki global sorgu filtreleri sayesinde, bir şirket sadece kendi verilerini görebilir.
+### Gerçek Zamanlı Bildirimler & Raporlama
+- ✅ **SignalR** ile canlı stok güncellemeleri (WebSocket bağlantısı)  
+- ✅ **QuestPDF** ile profesyonel depo durum raporu (PDF)  
+- ✅ Dashboard'da bölge doluluk grafikleri (Pie Chart & Bar Chart – Recharts)  
 
-Veri Güvenliği: Silme işlemleri IsDeleted bayrağı ile yapılır. Bu sayede veri kaybı önlenir, geçmiş stok hareketleri korunur ve yanlışlıkla silinen kayıtlar kurtarılabilir.
 
-3. ÖZGÜN DEPO MODELİ: FIXED LOCATION (SABİT LOKASYON)
 
-Küçük ve orta ölçekli üretim tesisleri için ideal olan bu modelde şu hiyerarşi izlenmiştir:
-6 Bölge (A-F) > 4 Koridor > 7 Raf > Toplam 168 Raf (Kapasite: 50 Birim/Raf)
+---
 
-NEDEN BU MODEL SEÇİLDİ?
+## 🛠️ Kullanılan Teknolojiler
 
-Hata Oranı: Her raf tek bir ürüne tahsis edildiği için operasyonel hatalar %90 oranında azalır.
+| Katman | Teknoloji |
+|--------|-----------|
+| **Backend** | .NET 9.0, ASP.NET Core Web API, Entity Framework Core, JWT, ASP.NET Core Identity |
+| **Frontend** | React 18, TypeScript, MUI 5, Recharts, SignalR, React Router |
+| **Mobil** | React Native (Expo), Expo Barcode Scanner, AsyncStorage, React Navigation |
+| **Veritabanı** | SQL Server, EF Core Migrations |
+| **Gerçek Zamanlı** | SignalR (WebSocket) |
+| **PDF Raporlama** | QuestPDF |
+| **Kimlik Doğrulama** | JWT + ASP.NET Core Identity + Rol Bazlı Yetkilendirme |
+| **Mimari** | N‑Tier (Entity → Repository → Manager → Controller), Generic Repository Pattern |
 
-Hız: "A-K1-R1" gibi spesifik adresleme formatı sayesinde personel bir ürünü saniyeler içinde bulabilir.
+---
 
-Hızlı Adaptasyon: Yeni çalışanlar depo düzenini çok kısa sürede ezberleyebilir.
+## ⚙️ Kurulum ve Çalıştırma
 
-4. KARŞILAŞILAN SORUNLAR VE ÇÖZÜMLER
+### Ön Gereksinimler
+- [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [Node.js 18+](https://nodejs.org/)
+- [SQL Server](https://www.microsoft.com/tr-tr/sql-server/sql-server-downloads)
+- [Expo CLI](https://docs.expo.dev/get-started/installation/) (mobil uygulama için)
 
-Serileştirme Sorunu (ValueTuple): Backend tarafında kullanılan ValueTuple yapısı JSON serileştirme sırasında frontend'e boş obje olarak dönüyordu. Bu sorun, özel bir DTO (ZoneOccupancyDto) oluşturularak ve tip güvenliği sağlanarak çözüldü.
+### 1. Backend (SmartWarehouse.API)
+```bash
+cd SmartWarehouse.API
+dotnet restore
+dotnet ef database update
+dotnet run 
 
-PDF Kütüphanesi Değişikliği: IronPDF kütüphanesinin native DLL bağımlılığı bazı ortamlarda çalışma hatalarına yol açıyordu. Bu nedenle tamamen managed code olan QuestPDF kütüphanesine geçiş yapıldı ve sistem stabil hale getirildi.
+API varsayılan olarak http://localhost:5041 adresinde çalışır.
 
-5. ÖZGÜN ÖZELLİKLER
 
-İnteraktif Depo Haritası: Bölgelerin doluluk oranları (Yeşil, Sarı, Turuncu, Kırmızı) görsel olarak takip edilebilir.
 
-Raf Detayları (Drill-Down): Rafa tıklandığında içindeki ürünlerin miktarını ve durumunu gösteren modal yapısı geliştirildi.
+Frontend (SmartWarehouse.UI)
+cd SmartWarehouse.UI
+npm install
+npm run dev 
 
-Veri Görselleştirme: Recharts ile depo doluluk dağılımı pasta ve çubuk grafiklerle analiz edilebilir hale getirildi.
+Panel varsayılan olarak http://localhost:5173 adresinde çalışır.
 
-Kritik Stok Uyarıları: 50 birim altına düşen raflar için alarm sistemi kuruldu.
 
-6. GELECEK GELİŞTİRMELER
+Mobil Uygulama (WarehouseMobile)
+cd WarehouseMobile
+npm install
+npx expo start -c  
 
-JWT Authentication ile yetkilendirme modülü.
+Rol	Yetkiler
+Admin	Tüm işlemler (ürün, stok, rapor, kullanıcı yönetimi, sistem sıfırlama)
+WarehouseManager	Ürün/stok yönetimi, üretim emri oluşturma/başlatma/tamamlama, rapor görüntüleme
+WarehouseStaff	Stok giriş/çıkış işlemleri, ürün listesini görüntüleme
+Accountant	Stok özeti, rapor ve PDF indirme
+Demo Kullanıcı: admin@depo.com / Admin123! / 11111111-1111-1111-1111-111111111111
 
-Dinamik lokasyon desteği (Aynı rafta birden fazla farklı SKU).
-
-Barkod/QR kod okuma ve mobil terminal entegrasyonu.
-
-🖼️ PROJE GÖRSELLERİ
-
-📊 Dashboard ve Analiz
-
-Depo doluluk oranlarını ve genel stok durumunu gösteren grafik ekranı.
-
-🗺️ İnteraktif Depo Haritası
-
-Bölgelerin doluluk oranına göre renk değiştirdiği interaktif harita yapısı.
-
-📋 Ürün Yönetimi
-
-Server-side pagination ve filtreleme özellikli ürün listesi.
-
-📄 PDF Raporlama
-
-QuestPDF ile oluşturulan profesyonel depo durum raporu.
-
-SONUÇ
-
-Geliştirilen sistem, mülakat dokümanındaki tüm gereksinimleri karşılamakla kalmayıp, görsel takip sistemleri ve sabit lokasyon modeliyle operasyonel verimliliği maksimize etmeyi hedeflemiştir.

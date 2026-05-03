@@ -32,4 +32,31 @@ Environment Files
 
 .env
 .env.local
-.env.development.local
+.env.development.local 
+
+# Bağımlılıklar
+node_modules/
+/SmartWarehouse.UI/node_modules
+/WarehouseMobile/node_modules
+
+# Build çıktıları
+/SmartWarehouse.API/bin/
+/SmartWarehouse.API/obj/
+/SmartWarehouse.UI/dist/
+/SmartWarehouse.UI/build/
+/WarehouseMobile/.expo/
+/WarehouseMobile/dist/
+
+# Kullanıcı ayarları ve ortam değişkenleri
+*.user
+*.suo
+*.env
+/SmartWarehouse.API/appsettings.Development.json
+
+# IDE ve geçici dosyalar
+.vs/
+.vscode/
+.idea/
+*.swp
+*.tmp
+Thumbs.db

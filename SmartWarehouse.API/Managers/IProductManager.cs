@@ -13,4 +13,4 @@ public interface IProductManager
     Task<bool> UpdateAsync(UpdateProductDto dto);
     
     Task<bool> DeleteAsync(int id, string companyId);
-}
+}                

@@ -73,7 +73,6 @@ public class StockMovementManager : IStockMovementManager
                     return false;
                 }
 
-                // AYNI RAFTA FARKLI ÜRÜN KONTROLÜ
                 var existingProducts = await _repository.Query(dto.CompanyId)
                     .Where(m => m.WarehouseZoneId == dto.WarehouseZoneId)
                     .GroupBy(m => m.ProductId)
@@ -90,7 +89,6 @@ public class StockMovementManager : IStockMovementManager
                 {
                     var existingProductId = existingProducts.First().ProductId;
                     
-                    // Mevcut ürünün adını bul
                     var existingProduct = await _repository.Query(dto.CompanyId)
                         .Include(m => m.Product)
                         .Where(m => m.ProductId == existingProductId)
@@ -104,7 +102,6 @@ public class StockMovementManager : IStockMovementManager
                     throw new InvalidOperationException($"Bu rafta zaten '{existingProductName}' ürünü bulunuyor! Aynı rafa sadece aynı ürünü ekleyebilirsiniz.");
                 }
 
-                // Zone'un mevcut stok miktarını hesapla
                 var currentZoneStock = existingProducts.FirstOrDefault()?.Quantity ?? 0;
 
                 Console.WriteLine($"Zone mevcut stok: {currentZoneStock}, Kapasite: {zone.Capacity}, Eklenmek istenen: {dto.Quantity}");
@@ -149,19 +146,6 @@ public class StockMovementManager : IStockMovementManager
         var zones = await _zoneRepository.Query(companyId).ToListAsync();
         Console.WriteLine($"Toplam zone sayısı: {zones.Count}");
         
-        if (zones.Count == 0)
-        {
-            Console.WriteLine("UYARI: Hiç zone bulunamadı! Varsayılan değerler döndürülüyor.");
-            var emptyResult = new Dictionary<string, ZoneOccupancyDto>();
-            var allZones = new[] { "A", "B", "C", "D", "E", "F" };
-            foreach (var zone in allZones)
-            {
-                emptyResult[zone] = new ZoneOccupancyDto { Stock = 0, Capacity = 1400 };
-                Console.WriteLine($"{zone} bölgesi: 0/1400 (varsayılan - zone yok)");
-            }
-            return emptyResult;
-        }
-        
         var zoneStocks = new Dictionary<int, int>();
 
         foreach (var zone in zones)
@@ -169,34 +153,25 @@ public class StockMovementManager : IStockMovementManager
             var stock = await _repository.Query(companyId)
                 .Where(m => m.WarehouseZoneId == zone.Id)
                 .GroupBy(m => m.WarehouseZoneId)
-                .Select(g => g.Sum(m => m.MovementType == "IN" ? m.Quantity : 0) - g.Sum(m => m.MovementType == "OUT" ? m.Quantity : 0))
+                .Select(g => g.Sum(m => m.MovementType == "IN" ? m.Quantity : 0) - 
+                             g.Sum(m => m.MovementType == "OUT" ? m.Quantity : 0))
                 .FirstOrDefaultAsync();
                 
             zoneStocks[zone.Id] = stock;
-            
             Console.WriteLine($"Zone {zone.Name} (ID: {zone.Id}): stock={stock}, capacity={zone.Capacity}");
         }
 
         var result = new Dictionary<string, ZoneOccupancyDto>();
+        var mainZones = new[] { "A", "B", "C", "D", "E", "F" };
         
-        var mainZonesList = new[] { "A", "B", "C", "D", "E", "F" };
-        
-        foreach (var mainZone in mainZonesList)
+        foreach (var mainZone in mainZones)
         {
-            var zonesInMain = zones.Where(z => z.Name.StartsWith(mainZone)).ToList();
-            if (zonesInMain.Any())
-            {
-                var totalStock = zonesInMain.Sum(z => zoneStocks.ContainsKey(z.Id) ? zoneStocks[z.Id] : 0);
-                var totalCapacity = zonesInMain.Sum(z => z.Capacity);
-                
-                result[mainZone] = new ZoneOccupancyDto { Stock = totalStock, Capacity = totalCapacity };
-                Console.WriteLine($"{mainZone} bölgesi toplam: {totalStock}/{totalCapacity} ({zonesInMain.Count} raf)");
-            }
-            else
-            {
-                result[mainZone] = new ZoneOccupancyDto { Stock = 0, Capacity = 1400 };
-                Console.WriteLine($"{mainZone} bölgesi: 0/1400 (varsayılan - bu bölgede raf yok)");
-            }
+            var zonesInMain = zones.Where(z => z.Name.StartsWith(mainZone + "-")).ToList();
+            var totalStock = zonesInMain.Sum(z => zoneStocks.ContainsKey(z.Id) ? zoneStocks[z.Id] : 0);
+            int totalCapacity = 1400;
+
+            result[mainZone] = new ZoneOccupancyDto { Stock = totalStock, Capacity = totalCapacity };
+            Console.WriteLine($"{mainZone} bölgesi toplam: {totalStock}/{totalCapacity} ({zonesInMain.Count} raf)");
         }
         
         var jsonResult = JsonSerializer.Serialize(result);
@@ -275,7 +250,6 @@ public class StockMovementManager : IStockMovementManager
         return rackDetails;
     }
 
-    // RAPOR METOTLARI
     public async Task<WarehouseReportDto> GetWarehouseReportAsync(string companyId)
     {
         Console.WriteLine($"=== Rapor oluşturuluyor. CompanyId: {companyId} ===");
@@ -328,30 +302,34 @@ public class StockMovementManager : IStockMovementManager
         foreach (var zone in mainZones)
         {
             var zonesInMain = await _zoneRepository.Query(companyId)
-                .Where(z => z.Name.StartsWith(zone))
+                .Where(z => z.Name.StartsWith(zone + "-"))
                 .ToListAsync();
 
             var totalStock = 0;
-            var totalCapacity = 0;
 
             foreach (var z in zonesInMain)
             {
                 var stock = await _repository.Query(companyId)
                     .Where(m => m.WarehouseZoneId == z.Id)
                     .GroupBy(m => m.WarehouseZoneId)
-                    .Select(g => g.Sum(m => m.MovementType == "IN" ? m.Quantity : 0) - g.Sum(m => m.MovementType == "OUT" ? m.Quantity : 0))
+                    .Select(g => g.Sum(m => m.MovementType == "IN" ? m.Quantity : 0) - 
+                                 g.Sum(m => m.MovementType == "OUT" ? m.Quantity : 0))
                     .FirstOrDefaultAsync();
                 
                 totalStock += stock;
-                totalCapacity += z.Capacity;
             }
+
+            var displayStock = Math.Max(0, totalStock);
+            int totalCapacity = 1400;
 
             zoneReports.Add(new ZoneReportDto
             {
                 Zone = zone,
-                Stock = totalStock,
-                Capacity = totalCapacity > 0 ? totalCapacity : 1400,
-                OccupancyPercentage = totalCapacity > 0 ? (int)((double)totalStock / totalCapacity * 100) : 0
+                Stock = displayStock,
+                Capacity = totalCapacity,
+                OccupancyPercentage = totalCapacity > 0 
+                    ? (int)((double)displayStock / totalCapacity * 100) 
+                    : 0
             });
         }
 
@@ -366,15 +344,12 @@ public class StockMovementManager : IStockMovementManager
             })
             .ToList();
 
-        var totalProducts = productStocks.Count;
-        var totalStockAll = productStocks.Sum(p => p.TotalStock);
-
         var report = new WarehouseReportDto
         {
             CompanyId = companyId,
             ReportDate = DateTime.UtcNow,
-            TotalProducts = totalProducts,
-            TotalStock = totalStockAll,
+            TotalProducts = productStocks.Count,
+            TotalStock = productStocks.Sum(p => p.TotalStock),
             Zones = zoneReports,
             CriticalProducts = criticalProducts,
             ProductStocks = productStocks
@@ -383,15 +358,10 @@ public class StockMovementManager : IStockMovementManager
         return report;
     }
 
-    // QUESTPDF İLE OLUŞTURULMUŞ METOT
     public async Task<byte[]> GeneratePdfReportAsync(string companyId)
     {
-        // Lisans ayarı (deneme sürümü için)
         QuestPDF.Settings.License = LicenseType.Community;
-        
         var report = await GetWarehouseReportAsync(companyId);
-        
-        // QuestPDF ile PDF oluştur
         var pdf = Document.Create(container =>
         {
             container.Page(page =>
@@ -399,14 +369,8 @@ public class StockMovementManager : IStockMovementManager
                 page.Size(PageSizes.A4);
                 page.Margin(20);
                 page.DefaultTextStyle(x => x.FontSize(10));
-                
-                // Başlık
                 page.Header().Element(ComposeHeader);
-                
-                // İçerik
                 page.Content().Element(container => ComposeContent(container, report));
-                
-                // Altbilgi
                 page.Footer().AlignCenter().Text(text =>
                 {
                     text.CurrentPageNumber();
@@ -415,7 +379,6 @@ public class StockMovementManager : IStockMovementManager
                 });
             });
         }).GeneratePdf();
-        
         return pdf;
     }
 
@@ -425,14 +388,9 @@ public class StockMovementManager : IStockMovementManager
         {
             row.RelativeItem().Column(column =>
             {
-                column.Item().Text("AKILLI DEPO YÖNETİM SİSTEMİ")
-                    .FontSize(16).Bold().FontColor(Colors.Blue.Medium);
-                
-                column.Item().Text($"Rapor Tarihi: {DateTime.Now:dd.MM.yyyy HH:mm}")
-                    .FontSize(10).FontColor(Colors.Grey.Darken2);
-                
-                column.Item().Text($"Şirket: COMP-101")
-                    .FontSize(10).FontColor(Colors.Grey.Darken2);
+                column.Item().Text("AKILLI DEPO YÖNETİM SİSTEMİ").FontSize(16).Bold().FontColor(Colors.Blue.Medium);
+                column.Item().Text($"Rapor Tarihi: {DateTime.Now:dd.MM.yyyy HH:mm}").FontSize(10).FontColor(Colors.Grey.Darken2);
+                column.Item().Text($"Şirket: COMP-101").FontSize(10).FontColor(Colors.Grey.Darken2);
             });
         });
     }
@@ -441,16 +399,9 @@ public class StockMovementManager : IStockMovementManager
     {
         container.Column(column =>
         {
-            // Özet bilgiler
             column.Item().PaddingVertical(10).Element(c => ComposeSummary(c, report));
-            
-            // Bölge Doluluk Tablosu
             column.Item().PaddingVertical(10).Element(c => ComposeZoneTable(c, report));
-            
-            // Kritik Stok Tablosu
             column.Item().PaddingVertical(10).Element(c => ComposeCriticalTable(c, report));
-            
-            // Stok Listesi
             column.Item().PaddingVertical(10).Element(c => ComposeProductTable(c, report));
         });
     }
@@ -464,14 +415,9 @@ public class StockMovementManager : IStockMovementManager
                 columns.RelativeColumn();
                 columns.RelativeColumn();
             });
-            
             table.Cell().Element(CellStyle).Text($"Toplam Ürün Çeşidi: {report.TotalProducts}").FontSize(12).Bold();
             table.Cell().Element(CellStyle).Text($"Toplam Stok Miktarı: {report.TotalStock}").FontSize(12).Bold();
-            
-            static IContainer CellStyle(IContainer container)
-            {
-                return container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(5);
-            }
+            static IContainer CellStyle(IContainer container) => container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(5);
         });
     }
 
@@ -480,7 +426,6 @@ public class StockMovementManager : IStockMovementManager
         container.Column(column =>
         {
             column.Item().Text("Bölge Doluluk Raporu").FontSize(14).Bold();
-            
             column.Item().Table(table =>
             {
                 table.ColumnsDefinition(columns =>
@@ -490,8 +435,6 @@ public class StockMovementManager : IStockMovementManager
                     columns.RelativeColumn();
                     columns.RelativeColumn();
                 });
-                
-                // Başlıklar
                 table.Header(header =>
                 {
                     header.Cell().Element(CellStyle).Text("Bölge").Bold();
@@ -499,24 +442,16 @@ public class StockMovementManager : IStockMovementManager
                     header.Cell().Element(CellStyle).Text("Kapasite").Bold();
                     header.Cell().Element(CellStyle).Text("Doluluk").Bold();
                 });
-                
-                // Veriler
                 foreach (var zone in report.Zones)
                 {
                     var color = zone.OccupancyPercentage > 90 ? Colors.Red.Medium : 
-                               zone.OccupancyPercentage > 70 ? Colors.Orange.Medium : 
-                               Colors.Green.Medium;
-                    
+                               zone.OccupancyPercentage > 70 ? Colors.Orange.Medium : Colors.Green.Medium;
                     table.Cell().Element(CellStyle).Text($"Bölge {zone.Zone}");
                     table.Cell().Element(CellStyle).Text(zone.Stock.ToString());
                     table.Cell().Element(CellStyle).Text(zone.Capacity.ToString());
                     table.Cell().Element(CellStyle).Text($"{zone.OccupancyPercentage}%").FontColor(color);
                 }
-                
-                static IContainer CellStyle(IContainer container)
-                {
-                    return container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(5);
-                }
+                static IContainer CellStyle(IContainer container) => container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(5);
             });
         });
     }
@@ -524,11 +459,9 @@ public class StockMovementManager : IStockMovementManager
     private void ComposeCriticalTable(IContainer container, WarehouseReportDto report)
     {
         if (!report.CriticalProducts.Any()) return;
-        
         container.Column(column =>
         {
             column.Item().Text("Kritik Stok Seviyesi (50 altı)").FontSize(14).Bold();
-            
             column.Item().Table(table =>
             {
                 table.ColumnsDefinition(columns =>
@@ -536,23 +469,17 @@ public class StockMovementManager : IStockMovementManager
                     columns.RelativeColumn();
                     columns.RelativeColumn();
                 });
-                
                 table.Header(header =>
                 {
                     header.Cell().Element(CellStyle).Text("Ürün").Bold();
                     header.Cell().Element(CellStyle).Text("Stok").Bold();
                 });
-                
                 foreach (var product in report.CriticalProducts)
                 {
                     table.Cell().Element(CellStyle).Text(product.ProductName);
                     table.Cell().Element(CellStyle).Text(product.TotalStock.ToString()).FontColor(Colors.Red.Medium);
                 }
-                
-                static IContainer CellStyle(IContainer container)
-                {
-                    return container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(5);
-                }
+                static IContainer CellStyle(IContainer container) => container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(5);
             });
         });
     }
@@ -562,7 +489,6 @@ public class StockMovementManager : IStockMovementManager
         container.Column(column =>
         {
             column.Item().Text("Stok Listesi (İlk 20 Ürün)").FontSize(14).Bold();
-            
             column.Item().Table(table =>
             {
                 table.ColumnsDefinition(columns =>
@@ -572,7 +498,6 @@ public class StockMovementManager : IStockMovementManager
                     columns.RelativeColumn();
                     columns.RelativeColumn(2);
                 });
-                
                 table.Header(header =>
                 {
                     header.Cell().Element(CellStyle).Text("Ürün").Bold();
@@ -580,21 +505,15 @@ public class StockMovementManager : IStockMovementManager
                     header.Cell().Element(CellStyle).Text("Stok").Bold();
                     header.Cell().Element(CellStyle).Text("Raf Lokasyonları").Bold();
                 });
-                
                 foreach (var product in report.ProductStocks.Take(20))
                 {
                     var locations = string.Join(", ", product.Locations.Select(l => $"{l.ZoneName}: {l.Quantity}"));
-                    
                     table.Cell().Element(CellStyle).Text(product.ProductName);
                     table.Cell().Element(CellStyle).Text(product.Barcode);
                     table.Cell().Element(CellStyle).Text(product.TotalStock.ToString());
                     table.Cell().Element(CellStyle).Text(locations);
                 }
-                
-                static IContainer CellStyle(IContainer container)
-                {
-                    return container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(5);
-                }
+                static IContainer CellStyle(IContainer container) => container.Border(1).BorderColor(Colors.Grey.Lighten2).Padding(5);
             });
         });
     }

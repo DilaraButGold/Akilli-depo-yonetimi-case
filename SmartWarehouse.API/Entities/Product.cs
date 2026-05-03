@@ -10,4 +10,7 @@ public class Product : BaseEntity
     
     // Ürün Açıklaması
     public string Description { get; set; } = string.Empty;
+
+    // Ürün Reçetesi (Bill of Materials) - Hammadde listesi
+    public ICollection<ProductMaterial> BillOfMaterials { get; set; } = new List<ProductMaterial>();
 }
